@@ -1,86 +1,74 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <sstream>
 
 using namespace std;
 
-class User {
-protected:
-    string username;
-    string password;
-public:
-    User(const string& uname, const string& pwd) : username(uname), password(pwd) {}
-
-    virtual bool login() {
-        cout << "Base login (should be overridden)." << endl;
-        return false;
-    }
-
-    virtual ~User() {}
-};
-
-class Employee : public User {
-public:
-    Employee(const string& uname, const string& pwd) : User(uname, pwd) {}
-
-    bool login() override {
-        cout << "Logging in as Employee..." << endl;
-        // Add employee features here.
-        return true;
-    }
-};
-
-class Admin : public User {
-public:
-    Admin(const string& uname, const string& pwd) : User(uname, pwd) {}
-
-    bool login() override {
-        cout << "Logging in as Admin..." << endl;
-        // Add admin features here.
-        return true;
-    }
-};
-
-// Function to check credentials in a given file
-bool checkCredentials(const string& filename, const string& username, const string& password) {
-    ifstream file(filename.c_str());
+// Function to check credentials against a file
+string checkCredentials(const string& username, const string& password, const string& filename) {
+    ifstream file(filename);
     if (!file) {
-        cout << "Error: Could not open " << filename << endl;
-        return false;
+        cout << "Warning: " << filename << " file not found." << endl;
+        return "";
     }
 
-    string fileUsername, filePassword;
-    while (file >> fileUsername >> filePassword) {
-        if (username == fileUsername && password == filePassword) {
-            return true;
+    string line;
+    while (getline(file, line)) {
+        // Parse line assuming format: username,password
+        stringstream ss(line);
+        string storedUsername, storedPassword;
+        
+        // Parse using comma as delimiter
+        getline(ss, storedUsername, ',');
+        getline(ss, storedPassword, ',');
+        
+        if (username == storedUsername && password == storedPassword) {
+            // If filename contains "admin", return "admin", otherwise "employee"
+            if (filename.find("admin") != string::npos) {
+                return "admin";
+            } else {
+                return "employee";
+            }
         }
     }
-    return false;
+    
+    return "";
 }
 
 int main() {
     string username, password;
-
+    string userType;
+    
+    cout << "\n===== LOGIN SYSTEM =====" << endl;
     cout << "Enter username: ";
     cin >> username;
-
     cout << "Enter password: ";
     cin >> password;
-
-    // Check in employee.txt
-    if (checkCredentials("employee.txt", username, password)) {
-        Employee emp(username, password);
-        emp.login();
+    
+    // Check admin credentials
+    userType = checkCredentials(username, password, "admin.txt");
+    
+    // If not found in admin.txt, check employee.txt
+    if (userType.empty()) {
+        userType = checkCredentials(username, password, "employee.txt");
     }
-    // Check in admin.txt
-    else if (checkCredentials("admin.txt", username, password)) {
-        Admin admin(username, password);
-        admin.login();
+    
+    if (!userType.empty()) {
+        cout << "Login successful! You are logged in as " << userType << "." << endl;
+        
+        // Add specific functionality based on user type
+        if (userType == "admin") {
+            cout << "Welcome to the Admin Panel. You have full access." << endl;
+            // Admin-specific functionality would go here
+        } else {
+            cout << "Welcome to the Employee Panel. You have limited access." << endl;
+            // Employee-specific functionality would go here
+        }
+        
+        return 0;
+    } else {
+        cout << "Login failed. Invalid username or password." << endl;
+        return 1;
     }
-    // Not found in either file
-    else {
-        cout << "Invalid username or password." << endl;
-    }
-
-    return 0;
 }
