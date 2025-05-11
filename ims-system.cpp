@@ -241,7 +241,7 @@ void adminMenu() {
         cout << "4. Reports" << endl;
         cout << "5. Logout" << endl;
         
-        adminChoice = inventoryManager.getValidIntInput("Enter your choice (1-5): ", 1);
+        adminChoice = inventoryManager.getValidIntInput("Enter your choice (1-4): ", 1);
         
         switch (adminChoice) {
             case 1:
@@ -251,12 +251,9 @@ void adminMenu() {
                 cout << "User management module - Coming soon!" << endl;
                 break;
             case 3:
-                cout << "System settings module - Coming soon!" << endl;
-                break;
-            case 4:
                 cout << "Reports module - Coming soon!" << endl;
                 break;
-            case 5:
+            case 4:
                 if (inventoryManager.getConfirmation("Are you sure you want to logout?")) {
                     cout << "Logging out from admin account..." << endl;
                     adminSession = false;
