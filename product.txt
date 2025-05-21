@@ -6,6 +6,5 @@
 6 Formal Trousers|90 340
 7 Skirts|110 490
 8 Dresses|85 300
-9 Shorts|95 270
+9 Shorts|100 270
 10 Polo Shirts|130 270
-12 orts|40 1

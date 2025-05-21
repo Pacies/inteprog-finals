@@ -8,141 +8,12 @@
 #include <ctime>
 #include <vector>
 #include <algorithm>
+#include <memory>
+#include <functional>
 
 using namespace std;
 
-// ================= USER MANAGEMENT SECTION =================
-
-struct User {
-    string username;
-    string password;
-};
-
-vector<User> loadUsers(const string& filename) {
-    vector<User> users;
-    ifstream file(filename);
-    string line;
-    while (getline(file, line)) {
-        stringstream ss(line);
-        string username, password;
-        if (getline(ss, username, ',') && getline(ss, password)) {
-            users.push_back({username, password});
-        }
-    }
-    return users;
-}
-
-void saveUsers(const vector<User>& users, const string& filename) {
-    ofstream file(filename);
-    for (const auto& user : users) {
-        file << user.username << "," << user.password << endl;
-    }
-}
-
-bool usernameExists(const vector<User>& users, const string& username) {
-    for (const auto& user : users) {
-        if (user.username == username) return true;
-    }
-    return false;
-}
-
-// ...existing code...
-
-void addUser(const string& filename) {
-    vector<User> users = loadUsers(filename);
-    string username, password;
-    cout << "Enter new username: ";
-    getline(cin, username); // Removed cin.ignore()
-    if (usernameExists(users, username)) {
-        cout << "Username already exists!" << endl;
-        return;
-    }
-    cout << "Enter password: ";
-    getline(cin, password);
-    users.push_back({username, password});
-    saveUsers(users, filename);
-    cout << "User added successfully." << endl;
-}
-
-void editUser(const string& filename) {
-    vector<User> users = loadUsers(filename);
-    string username;
-    cout << "Enter username to edit: ";
-    getline(cin, username); // Removed cin.ignore()
-    auto it = find_if(users.begin(), users.end(), [&](const User& u){ return u.username == username; });
-    if (it == users.end()) {
-        cout << "User not found." << endl;
-        return;
-    }
-    cout << "Enter new password: ";
-    getline(cin, it->password);
-    saveUsers(users, filename);
-    cout << "Password updated successfully." << endl;
-}
-
-void deleteUser(const string& filename) {
-    vector<User> users = loadUsers(filename);
-    string username;
-    cout << "Enter username to delete: ";
-    getline(cin, username); // Removed cin.ignore()
-    auto it = remove_if(users.begin(), users.end(), [&](const User& u){ return u.username == username; });
-    if (it == users.end()) {
-        cout << "User not found." << endl;
-        return;
-    }
-    users.erase(it, users.end());
-    saveUsers(users, filename);
-    cout << "User deleted successfully." << endl;
-}
-
-void listUsers(const string& filename) {
-    vector<User> users = loadUsers(filename);
-    cout << "Users in " << filename << ":" << endl;
-    for (const auto& user : users) {
-        cout << " - " << user.username << endl;
-    }
-}
-
-void adminUserManagementMenu() {
-    while (true) {
-        cout << "\n--- Admin User Management ---\n";
-        cout << "1. List Admins\n2. List Employees\n3. Add Admin\n4. Add Employee\n5. Edit Admin\n6. Edit Employee\n7. Delete Admin\n8. Delete Employee\n0. Back\nChoice: ";
-        int choice;
-        cin >> choice;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Only here!
-        switch (choice) {
-            case 1: listUsers("admin.txt"); break;
-            case 2: listUsers("employee.txt"); break;
-            case 3: addUser("admin.txt"); break;
-            case 4: addUser("employee.txt"); break;
-            case 5: editUser("admin.txt"); break;
-            case 6: editUser("employee.txt"); break;
-            case 7: deleteUser("admin.txt"); break;
-            case 8: deleteUser("employee.txt"); break;
-            case 0: return;
-            default: cout << "Invalid choice.\n";
-        }
-    }
-}
-
-// ================= INVENTORY SECTION =================
-
-string checkCredentials(const string& username, const string& password, const string& filename) {
-    ifstream file(filename);
-    if (!file) return "";
-    string line;
-    while (getline(file, line)) {
-        stringstream ss(line);
-        string storedUsername, storedPassword;
-        getline(ss, storedUsername, ',');
-        getline(ss, storedPassword, ',');
-        if (username == storedUsername && password == storedPassword) {
-            if (filename.find("admin") != string::npos) return "admin";
-            else return "employee";
-        }
-    }
-    return "";
-}
+// ================= UTILITY FUNCTIONS =================
 
 void clearInputBuffer() {
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
@@ -177,71 +48,252 @@ bool getConfirmation(const string& prompt) {
     return (tolower(response) == 'y');
 }
 
-// ================= INVENTORY CLASSES =================
+// ================= USER MANAGEMENT SECTION (SINGLETON) =================
 
-class Inventory {
-protected:
-    struct Record {
-        int id;
-        string name;
-        int quantity;
-        double price;
-        Record* next;
+class UserManager {
+private:
+    struct User {
+        string username;
+        string password;
     };
 
-    Record* head;
-    int nextId;
-    string filename;
-    bool isAdmin;
+    vector<User> adminUsers;
+    vector<User> employeeUsers;
+    
+    // Singleton instance
+    static UserManager* instance;
+    
+    // Private constructor for Singleton
+    UserManager() {
+        loadUsers("admin.txt", adminUsers);
+        loadUsers("employee.txt", employeeUsers);
+    }
+
+    void loadUsers(const string& filename, vector<User>& users) {
+        users.clear();
+        ifstream file(filename);
+        string line;
+        while (getline(file, line)) {
+            stringstream ss(line);
+            string username, password;
+            if (getline(ss, username, ',') && getline(ss, password)) {
+                users.push_back({username, password});
+            }
+        }
+    }
+
+    void saveUsers(const vector<User>& users, const string& filename) {
+        ofstream file(filename);
+        for (const auto& user : users) {
+            file << user.username << "," << user.password << endl;
+        }
+    }
+
+    bool usernameExists(const vector<User>& users, const string& username) {
+        return find_if(users.begin(), users.end(), 
+            [&](const User& u) { return u.username == username; }) != users.end();
+    }
 
 public:
-    Inventory(const string& file, bool admin = false) {
-        head = nullptr;
-        nextId = 1;
-        filename = file;
-        isAdmin = admin;
-        loadFromFile();
+    // Delete copy constructor and assignment operator
+    UserManager(const UserManager&) = delete;
+    UserManager& operator=(const UserManager&) = delete;
+    
+    // Get singleton instance
+    static UserManager* getInstance() {
+        if (!instance) {
+            instance = new UserManager();
+        }
+        return instance;
     }
-
-    virtual ~Inventory() {
-        saveToFile();
-        Record* current = head;
-        while (current != nullptr) {
-            Record* temp = current;
-            current = current->next;
-            delete temp;
+    
+    // Cleanup singleton
+    static void destroyInstance() {
+        if (instance) {
+            delete instance;
+            instance = nullptr;
         }
     }
 
-    void setAdminStatus(bool admin) {
-        isAdmin = admin;
+    string checkCredentials(const string& username, const string& password) {
+        // Check admin credentials
+        for (const auto& user : adminUsers) {
+            if (user.username == username && user.password == password) {
+                return "admin";
+            }
+        }
+        
+        // Check employee credentials
+        for (const auto& user : employeeUsers) {
+            if (user.username == username && user.password == password) {
+                return "employee";
+            }
+        }
+        
+        return "";
     }
 
-    virtual void displayMenu() = 0;
-
-    void addRecord() {
-        if (!isAdmin) {
-            cout << "Access denied. Only administrators can add new records." << endl;
+    void addUser(bool isAdmin) {
+        vector<User>& users = isAdmin ? adminUsers : employeeUsers;
+        string filename = isAdmin ? "admin.txt" : "employee.txt";
+        string userType = isAdmin ? "admin" : "employee";
+        
+        string username, password;
+        cout << "Enter new " << userType << " username: ";
+        getline(cin, username);
+        
+        if (usernameExists(adminUsers, username) || usernameExists(employeeUsers, username)) {
+            cout << "Username already exists!" << endl;
             return;
         }
-        Record* newRecord = new Record;
-        newRecord->id = nextId++;
-        cout << "Enter name: ";
+        
+        cout << "Enter password: ";
+        getline(cin, password);
+        
+        users.push_back({username, password});
+        saveUsers(users, filename);
+        cout << "User added successfully." << endl;
+    }
+
+    void editUser(bool isAdmin) {
+        vector<User>& users = isAdmin ? adminUsers : employeeUsers;
+        string filename = isAdmin ? "admin.txt" : "employee.txt";
+        string userType = isAdmin ? "admin" : "employee";
+        
+        string username;
+        cout << "Enter " << userType << " username to edit: ";
+        getline(cin, username);
+        
+        auto it = find_if(users.begin(), users.end(), 
+            [&](const User& u) { return u.username == username; });
+            
+        if (it == users.end()) {
+            cout << "User not found." << endl;
+            return;
+        }
+        
+        cout << "Enter new password: ";
+        getline(cin, it->password);
+        
+        saveUsers(users, filename);
+        cout << "Password updated successfully." << endl;
+    }
+
+    void deleteUser(bool isAdmin) {
+        vector<User>& users = isAdmin ? adminUsers : employeeUsers;
+        string filename = isAdmin ? "admin.txt" : "employee.txt";
+        string userType = isAdmin ? "admin" : "employee";
+        
+        string username;
+        cout << "Enter " << userType << " username to delete: ";
+        getline(cin, username);
+        
+        auto it = remove_if(users.begin(), users.end(), 
+            [&](const User& u) { return u.username == username; });
+            
+        if (it == users.end()) {
+            cout << "User not found." << endl;
+            return;
+        }
+        
+        users.erase(it, users.end());
+        saveUsers(users, filename);
+        cout << "User deleted successfully." << endl;
+    }
+
+    void listUsers(bool isAdmin) {
+        vector<User>& users = isAdmin ? adminUsers : employeeUsers;
+        string userType = isAdmin ? "admin" : "employee";
+        
+        cout << userType << " users:" << endl;
+        for (const auto& user : users) {
+            cout << " - " << user.username << endl;
+        }
+    }
+
+    void createDefaultCredentialsIfNeeded() {
+        if (adminUsers.empty()) {
+            adminUsers.push_back({"admin", "admin123"});
+            saveUsers(adminUsers, "admin.txt");
+            cout << "Created default admin credentials." << endl;
+        }
+        
+        if (employeeUsers.empty()) {
+            employeeUsers.push_back({"employee", "emp123"});
+            saveUsers(employeeUsers, "employee.txt");
+            cout << "Created default employee credentials." << endl;
+        }
+    }
+};
+
+// Initialize static member
+UserManager* UserManager::instance = nullptr;
+
+// ================= INVENTORY SECTION (STRATEGY PATTERN) =================
+
+// Record structure used by all inventory types
+struct Record {
+    int id;
+    string name;
+    int quantity;
+    double price;
+    Record* next;
+    
+    Record(int _id, const string& _name, int _qty, double _price) 
+        : id(_id), name(_name), quantity(_qty), price(_price), next(nullptr) {}
+};
+
+// Strategy interface for inventory operations
+class InventoryType {
+public:
+    std::function<void()> onModified; // Callback to notify modifications
+    virtual ~InventoryType() = default;
+    virtual void addRecord(Record*& head, int& nextId, bool isAdmin) = 0;
+    virtual void editRecord(Record* head, bool isAdmin) = 0;
+    virtual void deleteRecord(Record*& head, bool isAdmin) = 0;
+    virtual void displayInventory(Record* head) = 0;
+    virtual void displayMenu(Record*& head, int& nextId, bool isAdmin) = 0;
+};
+
+// Concrete class for Raw Material inventory
+class RawMaterialInventory : public InventoryType {
+public:
+    void addRecord(Record*& head, int& nextId, bool isAdmin) override {
+        if (!isAdmin) {
+            cout << "Access denied. Only administrators can add new raw materials." << endl;
+            return;
+        }
+        
+        string name;
+        cout << "Enter raw material name: ";
         cin.ignore();
-        getline(cin, newRecord->name);
+        getline(cin, name);
+        
+        // Check for duplicate name
+        Record* current = head;
+        while (current != nullptr) {
+            if (current->name == name) {
+                cout << "A raw material with this name already exists!" << endl;
+                return;
+            }
+            current = current->next;
+        }
+        
         bool isValidName = true;
-        for (char c : newRecord->name) {
+        for (char c : name) {
             if (isdigit(c)) {
                 isValidName = false;
                 break;
             }
         }
+        
         if (!isValidName) {
             cout << "Invalid name. Name should not contain numbers." << endl;
-            delete newRecord;
             return;
         }
-        newRecord->quantity = getValidIntInput("Enter quantity: ", 1);
+        
+        int quantity = getValidIntInput("Enter quantity: ", 1);
+        
         double price = 0;
         bool isValidPrice = false;
         do {
@@ -258,13 +310,14 @@ public:
                 clearInputBuffer();
             }
         } while (!isValidPrice);
-        newRecord->price = price;
-        if (!getConfirmation("Are you sure you want to add this record?")) {
+        
+        if (!getConfirmation("Are you sure you want to add this raw material?")) {
             cout << "Operation cancelled." << endl;
-            delete newRecord;
             return;
         }
-        newRecord->next = nullptr;
+        
+        Record* newRecord = new Record(nextId++, name, quantity, price);
+        
         if (head == nullptr) {
             head = newRecord;
         } else {
@@ -274,19 +327,23 @@ public:
             }
             current->next = newRecord;
         }
-        cout << "Record added successfully." << endl;
-        saveToFile();
+        
+        cout << "Raw material added successfully." << endl;
+        if (onModified) onModified();
     }
 
-    void editRecord() {
+    void editRecord(Record* head, bool isAdmin) override {
         if (head == nullptr) {
-            cout << "No records available to edit." << endl;
+            cout << "No raw materials available to edit." << endl;
             return;
         }
-        displayInventory();
-        int idToEdit = getValidIntInput("Enter ID of record to edit: ", 1);
+        
+        displayInventory(head);
+        int idToEdit = getValidIntInput("Enter ID of raw material to edit: ", 1);
+        
         Record* current = head;
         bool found = false;
+        
         while (current != nullptr && !found) {
             if (current->id == idToEdit) {
                 found = true;
@@ -294,19 +351,23 @@ public:
             }
             current = current->next;
         }
+        
         if (!found) {
-            cout << "Record with ID " << idToEdit << " not found." << endl;
+            cout << "Raw material with ID " << idToEdit << " not found." << endl;
             return;
         }
-        cout << "Editing record with ID: " << idToEdit << endl;
+        
+        cout << "Editing raw material with ID: " << idToEdit << endl;
         cout << "Current name: " << current->name << endl;
         cout << "Current quantity: " << current->quantity << endl;
         cout << "Current unit price: $" << fixed << setprecision(2) << current->price << endl;
+        
         if (isAdmin) {
             cout << "Enter new name (or press Enter to keep current): ";
             string newName;
             cin.ignore();
             getline(cin, newName);
+            
             if (!newName.empty()) {
                 bool isValidName = true;
                 for (char c : newName) {
@@ -315,6 +376,7 @@ public:
                         break;
                     }
                 }
+                
                 if (!isValidName) {
                     cout << "Invalid name. Name should not contain numbers. Name not updated." << endl;
                 } else {
@@ -322,58 +384,70 @@ public:
                 }
             }
         }
+        
         cout << "Enter new quantity (or 0 to keep current): ";
         int newQuantity;
         cin >> newQuantity;
+        
         if (newQuantity > 0) {
             current->quantity = newQuantity;
         } else if (newQuantity < 0) {
             cout << "Invalid quantity. Quantity must be positive. Quantity not updated." << endl;
         }
+        
         if (isAdmin) {
             cout << "Enter new unit price (or 0 to keep current): ";
             double newPrice;
             cin >> newPrice;
+            
             if (newPrice > 0) {
                 current->price = newPrice;
             } else if (newPrice < 0) {
                 cout << "Invalid price. Price must be positive. Price not updated." << endl;
             }
         }
+        
         if (!getConfirmation("Save these changes?")) {
             cout << "Operation cancelled. No changes saved." << endl;
             return;
         }
-        cout << "Record updated successfully." << endl;
-        saveToFile();
+        
+        cout << "Raw material updated successfully." << endl;
+        if (onModified) onModified();
     }
 
-    void deleteRecord() {
+    void deleteRecord(Record*& head, bool isAdmin) override {
         if (!isAdmin) {
-            cout << "Access denied. Only administrators can delete records." << endl;
+            cout << "Access denied. Only administrators can delete raw materials." << endl;
             return;
         }
+        
         if (head == nullptr) {
-            cout << "No records available to delete." << endl;
+            cout << "No raw materials available to delete." << endl;
             return;
         }
-        displayInventory();
-        int idToDelete = getValidIntInput("Enter ID of record to delete: ", 1);
-        if (!getConfirmation("Are you sure you want to delete this record?")) {
+        
+        displayInventory(head);
+        int idToDelete = getValidIntInput("Enter ID of raw material to delete: ", 1);
+        
+        if (!getConfirmation("Are you sure you want to delete this raw material?")) {
             cout << "Operation cancelled." << endl;
             return;
         }
+        
         if (head->id == idToDelete) {
             Record* temp = head;
             head = head->next;
             delete temp;
-            cout << "Record deleted successfully." << endl;
-            saveToFile();
+            cout << "Raw material deleted successfully." << endl;
+            if (onModified) onModified();
             return;
         }
+        
         Record* current = head;
         Record* previous = nullptr;
         bool found = false;
+        
         while (current != nullptr && !found) {
             if (current->id == idToDelete) {
                 found = true;
@@ -382,27 +456,31 @@ public:
             previous = current;
             current = current->next;
         }
+        
         if (!found) {
-            cout << "Record with ID " << idToDelete << " not found." << endl;
+            cout << "Raw material with ID " << idToDelete << " not found." << endl;
             return;
         }
+        
         previous->next = current->next;
         delete current;
-        cout << "Record deleted successfully." << endl;
-        saveToFile();
+        cout << "Raw material deleted successfully." << endl;
+        if (onModified) onModified();
     }
 
-    void displayInventory() {
+    void displayInventory(Record* head) override {
         if (head == nullptr) {
-            cout << "No records available." << endl;
+            cout << "No raw materials available." << endl;
             return;
         }
-        cout << "\n------ Inventory Records ------" << endl;
+        
+        cout << "\n------ Raw Material Inventory ------" << endl;
         cout << left << setw(5) << "ID"
              << setw(20) << "Name"
              << setw(10) << "Quantity"
              << "Price" << endl;
         cout << string(50, '-') << endl;
+        
         Record* current = head;
         while (current != nullptr) {
             cout << left << setw(5) << current->id
@@ -411,13 +489,344 @@ public:
                  << "$" << fixed << setprecision(2) << current->price << endl;
             current = current->next;
         }
+        
         cout << string(50, '-') << endl;
     }
 
-protected:
+    void displayMenu(Record*& head, int& nextId, bool isAdmin) override {
+        bool running = true;
+        while (running) {
+            cout << "\n" << string(30, '=') << endl;
+            cout << setw(25) << "Raw Material Inventory Menu" << endl;
+            cout << string(30, '=') << endl;
+            
+            if (isAdmin) {
+                cout << "1. Add Raw Material" << endl;
+                cout << "2. Edit Raw Material" << endl;
+                cout << "3. Delete Raw Material" << endl;
+                cout << "4. Display Raw Materials" << endl;
+                cout << "5. Return to Previous Menu" << endl;
+                
+                int choice = getValidIntInput("Enter your choice (1-5): ", 1);
+                switch (choice) {
+                    case 1: addRecord(head, nextId, isAdmin); break;
+                    case 2: editRecord(head, isAdmin); break;
+                    case 3: deleteRecord(head, isAdmin); break;
+                    case 4: displayInventory(head); break;
+                    case 5:
+                        if (getConfirmation("Are you sure you want to return to the previous menu?")) 
+                            running = false;
+                        break;
+                    default: cout << "Invalid choice. Please try again." << endl;
+                }
+            } else {
+                cout << "1. Edit Raw Material Quantity" << endl;
+                cout << "2. Display Raw Materials" << endl;
+                cout << "3. Return to Previous Menu" << endl;
+                
+                int choice = getValidIntInput("Enter your choice (1-3): ", 1);
+                switch (choice) {
+                    case 1: editRecord(head, isAdmin); break;
+                    case 2: displayInventory(head); break;
+                    case 3:
+                        if (getConfirmation("Are you sure you want to return to the previous menu?")) 
+                            running = false;
+                        break;
+                    default: cout << "Invalid choice. Please try again." << endl;
+                }
+            }
+        }
+    }
+};
+
+// Concrete class for Product inventory
+class ProductInventory : public InventoryType {
+public:
+    void addRecord(Record*& head, int& nextId, bool isAdmin) override {
+        if (!isAdmin) {
+            cout << "Access denied. Only administrators can add new products." << endl;
+            return;
+        }
+        
+        string name;
+        cout << "Enter product name: ";
+        cin.ignore();
+        getline(cin, name);
+        
+        bool isValidName = true;
+        for (char c : name) {
+            if (isdigit(c)) {
+                isValidName = false;
+                break;
+            }
+        }
+        
+        if (!isValidName) {
+            cout << "Invalid name. Name should not contain numbers." << endl;
+            return;
+        }
+        
+        int quantity = getValidIntInput("Enter quantity: ", 1);
+        
+        double price = 0;
+        bool isValidPrice = false;
+        do {
+            cout << "Enter unit price: ";
+            if (cin >> price) {
+                if (price > 0) {
+                    isValidPrice = true;
+                } else {
+                    cout << "Invalid price. Price must be positive." << endl;
+                }
+            } else {
+                cout << "Invalid input. Please enter a number." << endl;
+                cin.clear();
+                clearInputBuffer();
+            }
+        } while (!isValidPrice);
+        
+        if (!getConfirmation("Are you sure you want to add this product?")) {
+            cout << "Operation cancelled." << endl;
+            return;
+        }
+        
+        Record* newRecord = new Record(nextId++, name, quantity, price);
+        
+        if (head == nullptr) {
+            head = newRecord;
+        } else {
+            Record* current = head;
+            while (current->next != nullptr) {
+                current = current->next;
+            }
+            current->next = newRecord;
+        }
+        
+        cout << "Product added successfully." << endl;
+        if (onModified) onModified();
+    }
+
+    void editRecord(Record* head, bool isAdmin) override {
+        if (head == nullptr) {
+            cout << "No products available to edit." << endl;
+            return;
+        }
+        
+        displayInventory(head);
+        int idToEdit = getValidIntInput("Enter ID of product to edit: ", 1);
+        
+        Record* current = head;
+        bool found = false;
+        
+        while (current != nullptr && !found) {
+            if (current->id == idToEdit) {
+                found = true;
+                break;
+            }
+            current = current->next;
+        }
+        
+        if (!found) {
+            cout << "Product with ID " << idToEdit << " not found." << endl;
+            return;
+        }
+        
+        cout << "Editing product with ID: " << idToEdit << endl;
+        cout << "Current name: " << current->name << endl;
+        cout << "Current quantity: " << current->quantity << endl;
+        cout << "Current unit price: $" << fixed << setprecision(2) << current->price << endl;
+        
+        if (isAdmin) {
+            cout << "Enter new name (or press Enter to keep current): ";
+            string newName;
+            cin.ignore();
+            getline(cin, newName);
+            
+            if (!newName.empty()) {
+                bool isValidName = true;
+                for (char c : newName) {
+                    if (isdigit(c)) {
+                        isValidName = false;
+                        break;
+                    }
+                }
+                
+                if (!isValidName) {
+                    cout << "Invalid name. Name should not contain numbers. Name not updated." << endl;
+                } else {
+                    current->name = newName;
+                }
+            }
+        }
+        
+        cout << "Enter new quantity (or 0 to keep current): ";
+        int newQuantity;
+        cin >> newQuantity;
+        
+        if (newQuantity > 0) {
+            current->quantity = newQuantity;
+        } else if (newQuantity < 0) {
+            cout << "Invalid quantity. Quantity must be positive. Quantity not updated." << endl;
+        }
+        
+        if (isAdmin) {
+            cout << "Enter new unit price (or 0 to keep current): ";
+            double newPrice;
+            cin >> newPrice;
+            
+            if (newPrice > 0) {
+                current->price = newPrice;
+            } else if (newPrice < 0) {
+                cout << "Invalid price. Price must be positive. Price not updated." << endl;
+            }
+        }
+        
+        if (!getConfirmation("Save these changes?")) {
+            cout << "Operation cancelled. No changes saved." << endl;
+            return;
+        }
+        
+        cout << "Product updated successfully." << endl;
+        if (onModified) onModified();
+    }
+
+    void deleteRecord(Record*& head, bool isAdmin) override {
+        if (!isAdmin) {
+            cout << "Access denied. Only administrators can delete products." << endl;
+            return;
+        }
+        
+        if (head == nullptr) {
+            cout << "No products available to delete." << endl;
+            return;
+        }
+        
+        displayInventory(head);
+        int idToDelete = getValidIntInput("Enter ID of product to delete: ", 1);
+        
+        if (!getConfirmation("Are you sure you want to delete this product?")) {
+            cout << "Operation cancelled." << endl;
+            return;
+        }
+        
+        if (head->id == idToDelete) {
+            Record* temp = head;
+            head = head->next;
+            delete temp;
+            cout << "Product deleted successfully." << endl;
+            if (onModified) onModified();
+            return;
+        }
+        
+        Record* current = head;
+        Record* previous = nullptr;
+        bool found = false;
+        
+        while (current != nullptr && !found) {
+            if (current->id == idToDelete) {
+                found = true;
+                break;
+            }
+            previous = current;
+            current = current->next;
+        }
+        
+        if (!found) {
+            cout << "Product with ID " << idToDelete << " not found." << endl;
+            return;
+        }
+        
+        previous->next = current->next;
+        delete current;
+        cout << "Product deleted successfully." << endl;
+        if (onModified) onModified();
+    }
+
+    void displayInventory(Record* head) override {
+        if (head == nullptr) {
+            cout << "No products available." << endl;
+            return;
+        }
+        
+        cout << "\n------ Product Inventory ------" << endl;
+        cout << left << setw(5) << "ID"
+             << setw(20) << "Name"
+             << setw(10) << "Quantity"
+             << "Price" << endl;
+        cout << string(50, '-') << endl;
+        
+        Record* current = head;
+        while (current != nullptr) {
+            cout << left << setw(5) << current->id
+                 << setw(20) << current->name
+                 << setw(10) << current->quantity
+                 << "$" << fixed << setprecision(2) << current->price << endl;
+            current = current->next;
+        }
+        
+        cout << string(50, '-') << endl;
+    }
+
+    void displayMenu(Record*& head, int& nextId, bool isAdmin) override {
+        bool running = true;
+        while (running) {
+            cout << "\n" << string(30, '=') << endl;
+            cout << setw(22) << "Product Inventory Menu" << endl;
+            cout << string(30, '=') << endl;
+            
+            if (isAdmin) {
+                cout << "1. Add Product" << endl;
+                cout << "2. Edit Product" << endl;
+                cout << "3. Delete Product" << endl;
+                cout << "4. Display Products" << endl;
+                cout << "5. Return to Previous Menu" << endl;
+                
+                int choice = getValidIntInput("Enter your choice (1-5): ", 1);
+                switch (choice) {
+                    case 1: addRecord(head, nextId, isAdmin); break;
+                    case 2: editRecord(head, isAdmin); break;
+                    case 3: deleteRecord(head, isAdmin); break;
+                    case 4: displayInventory(head); break;
+                    case 5:
+                        if (getConfirmation("Are you sure you want to return to the previous menu?")) 
+                            running = false;
+                        break;
+                    default: cout << "Invalid choice. Please try again." << endl;
+                }
+            } else {
+                cout << "1. Edit Product Quantity" << endl;
+                cout << "2. Display Products" << endl;
+                cout << "3. Return to Previous Menu" << endl;
+                
+                int choice = getValidIntInput("Enter your choice (1-3): ", 1);
+                switch (choice) {
+                    case 1: editRecord(head, isAdmin); break;
+                    case 2: displayInventory(head); break;
+                    case 3:
+                        if (getConfirmation("Are you sure you want to return to the previous menu?")) 
+                            running = false;
+                        break;
+                    default: cout << "Invalid choice. Please try again." << endl;
+                }
+            }
+        }
+    }
+};
+
+// Inventory class that uses Strategy pattern
+class Inventory {
+private:
+    Record* head;
+    int nextId;
+    string filename;
+    bool isAdmin;
+    unique_ptr<InventoryType> strategy;
+
     void loadFromFile() {
         ifstream file(filename);
         if (!file.is_open()) return;
+        
+        // Clear existing records
         while (head != nullptr) {
             Record* temp = head;
             head = head->next;
@@ -425,24 +834,24 @@ protected:
         }
         head = nullptr;
         nextId = 1;
+        
         int id;
         string name;
         int quantity;
         double price;
         string line;
+        
         while (getline(file, line)) {
             stringstream ss(line);
             ss >> id;
             ss.ignore();
             getline(ss, name, '|');
             ss >> quantity >> price;
-            Record* newRecord = new Record;
-            newRecord->id = id;
-            newRecord->name = name;
-            newRecord->quantity = quantity;
-            newRecord->price = price;
-            newRecord->next = nullptr;
+            
+            Record* newRecord = new Record(id, name, quantity, price);
+            
             if (id >= nextId) nextId = id + 1;
+            
             if (head == nullptr) {
                 head = newRecord;
             } else {
@@ -462,6 +871,7 @@ protected:
             cout << "Error: Could not open file for saving." << endl;
             return;
         }
+        
         Record* current = head;
         while (current != nullptr) {
             file << current->id << " " << current->name << "|"
@@ -470,108 +880,233 @@ protected:
         }
         file.close();
     }
+
+public:
+    Inventory(const string& file, unique_ptr<InventoryType> strat, bool admin = false) 
+        : head(nullptr), nextId(1), filename(file), isAdmin(admin), strategy(move(strat)) {
+        strategy->onModified = [this]() { this->saveToFile(); };
+        loadFromFile();
+    }
+
+    ~Inventory() {
+        saveToFile();
+        Record* current = head;
+        while (current != nullptr) {
+            Record* temp = current;
+            current = current->next;
+            delete temp;
+        }
+    }
+
+    void setAdminStatus(bool admin) {
+        isAdmin = admin;
+    }
+
+    void displayMenu() {
+        strategy->displayMenu(head, nextId, isAdmin);
+        saveToFile();
+    }
 };
 
-class RawMaterialInventory : public Inventory {
+// ================= REPORT MANAGER (SINGLETON) =================
+
+class ReportManager {
+private:
+    static ReportManager* instance;
+    
+    // Private constructor for Singleton
+    ReportManager() {}
+    
 public:
-    RawMaterialInventory(bool admin = false) : Inventory("rawmaterial.txt", admin) {}
-    void displayMenu() override {
-        bool running = true;
-        while (running) {
-            cout << "\n" << string(30, '=') << endl;
-            cout << setw(25) << "Raw Material Inventory Menu" << endl;
-            cout << string(30, '=') << endl;
-            if (isAdmin) {
-                cout << "1. Add Raw Material" << endl;
-                cout << "2. Edit Raw Material" << endl;
-                cout << "3. Delete Raw Material" << endl;
-                cout << "4. Display Raw Materials" << endl;
-                cout << "5. Return to Previous Menu" << endl;
-                int choice = getValidIntInput("Enter your choice (1-5): ", 1);
-                switch (choice) {
-                    case 1: addRecord(); break;
-                    case 2: editRecord(); break;
-                    case 3: deleteRecord(); break;
-                    case 4: displayInventory(); break;
-                    case 5:
-                        if (getConfirmation("Are you sure you want to return to the previous menu?")) running = false;
-                        break;
-                    default: cout << "Invalid choice. Please try again." << endl;
-                }
-            } else {
-                cout << "1. Edit Raw Material Quantity" << endl;
-                cout << "2. Display Raw Materials" << endl;
-                cout << "3. Return to Previous Menu" << endl;
-                int choice = getValidIntInput("Enter your choice (1-3): ", 1);
-                switch (choice) {
-                    case 1: editRecord(); break;
-                    case 2: displayInventory(); break;
-                    case 3:
-                        if (getConfirmation("Are you sure you want to return to the previous menu?")) running = false;
-                        break;
-                    default: cout << "Invalid choice. Please try again." << endl;
-                }
-            }
+    // Delete copy constructor and assignment operator
+    ReportManager(const ReportManager&) = delete;
+    ReportManager& operator=(const ReportManager&) = delete;
+    
+    // Get singleton instance
+    static ReportManager* getInstance() {
+        if (!instance) {
+            instance = new ReportManager();
+        }
+        return instance;
+    }
+    
+    // Cleanup singleton
+    static void destroyInstance() {
+        if (instance) {
+            delete instance;
+            instance = nullptr;
+        }
+    }
+
+    void displayRawMatReport() {
+        struct ReportRecord {
+            int id;
+            string name;
+            int quantity;
+            double price;
+        };
+        
+        ifstream file("rawmaterial.txt");
+        if (!file.is_open()) {
+            cout << "Error: Could not open rawmaterial.txt for reading." << endl;
+            return;
+        }
+        
+        time_t now = time(0);
+        char* dt = ctime(&now);
+        
+        cout << "\n" << string(70, '=') << endl;
+        cout << setw(45) << "RAW MATERIAL INVENTORY REPORT" << endl;
+        cout << "Generated on: " << dt;
+        cout << string(70, '=') << endl;
+        cout << left << setw(5) << "ID"
+             << setw(25) << "Product Name"
+             << setw(10) << "Quantity"
+             << setw(15) << "Unit Price"
+             << setw(15) << "Value" << endl;
+        cout << string(70, '-') << endl;
+        
+        int totalQuantity = 0;
+        double totalValue = 0.0;
+        string line;
+        
+        while (getline(file, line)) {
+            stringstream ss(line);
+            ReportRecord record;
+            ss >> record.id;
+            ss.ignore();
+            getline(ss, record.name, '|');
+            ss >> record.quantity >> record.price;
+            
+            double value = record.quantity * record.price;
+            totalQuantity += record.quantity;
+            totalValue += value;
+            
+            cout << left << setw(5) << record.id
+                 << setw(25) << record.name
+                 << setw(10) << record.quantity
+                 << "$" << setw(14) << fixed << setprecision(2) << record.price
+                 << "$" << setw(14) << fixed << setprecision(2) << value << endl;
+        }
+        
+        file.close();
+        
+        cout << string(70, '-') << endl;
+        cout << left << setw(30) << "TOTAL:"
+             << setw(10) << totalQuantity
+             << setw(15) << ""
+             << "$" << fixed << setprecision(2) << totalValue << endl;
+        cout << string(70, '=') << endl;
+    }
+
+    void displayProductReport() {
+        struct ReportRecord {
+            int id;
+            string name;
+            int quantity;
+            double price;
+        };
+        
+        ifstream file("product.txt");
+        if (!file.is_open()) {
+            cout << "Error: Could not open product.txt for reading." << endl;
+            return;
+        }
+        
+        time_t now = time(0);
+        char* dt = ctime(&now);
+        
+        cout << "\n" << string(70, '=') << endl;
+        cout << setw(45) << "PRODUCT INVENTORY REPORT" << endl;
+        cout << "Generated on: " << dt;
+        cout << string(70, '=') << endl;
+        cout << left << setw(5) << "ID"
+             << setw(25) << "Product Name"
+             << setw(10) << "Quantity"
+             << setw(15) << "Unit Price"
+             << setw(15) << "Value" << endl;
+        cout << string(70, '-') << endl;
+        
+        int totalQuantity = 0;
+        double totalValue = 0.0;
+        string line;
+        
+        while (getline(file, line)) {
+            stringstream ss(line);
+            ReportRecord record;
+            ss >> record.id;
+            ss.ignore();
+            getline(ss, record.name, '|');
+            ss >> record.quantity >> record.price;
+            
+            double value = record.quantity * record.price;
+            totalQuantity += record.quantity;
+            totalValue += value;
+            
+            cout << left << setw(5) << record.id
+                 << setw(25) << record.name
+                 << setw(10) << record.quantity
+                 << "$" << setw(14) << fixed << setprecision(2) << record.price
+                 << "$" << setw(14) << fixed << setprecision(2) << value << endl;
+        }
+        
+        file.close();
+        
+        cout << string(70, '-') << endl;
+        cout << left << setw(30) << "TOTAL:"
+             << setw(10) << totalQuantity
+             << setw(15) << ""
+             << "$" << fixed << setprecision(2) << totalValue << endl;
+        cout << string(70, '=') << endl;
+    }
+
+    void reportUI() {
+        cout << "\n--------------------------------" << endl;
+        cout << "|       REPORTS DASHBOARD      |" << endl;
+        cout << "--------------------------------" << endl;
+        cout << "1. Product Inventory Report" << endl;
+        cout << "2. Raw Material Inventory Report" << endl;
+        cout << "3. Return to Previous Menu" << endl;
+        
+        int choice = getValidIntInput("Enter your choice (1-3): ", 1);
+        switch (choice) {
+            case 1: displayProductReport(); break;
+            case 2: displayRawMatReport(); break;
+            case 3: cout << "Returning to previous menu..." << endl; break;
+            default: cout << "Invalid choice. Please try again." << endl; break;
         }
     }
 };
 
-class ProductInventory : public Inventory {
-public:
-    ProductInventory(bool admin = false) : Inventory("product.txt", admin) {}
-    void displayMenu() override {
-        bool running = true;
-        while (running) {
-            cout << "\n" << string(30, '=') << endl;
-            cout << setw(22) << "Product Inventory Menu" << endl;
-            cout << string(30, '=') << endl;
-            if (isAdmin) {
-                cout << "1. Add Product" << endl;
-                cout << "2. Edit Product" << endl;
-                cout << "3. Delete Product" << endl;
-                cout << "4. Display Products" << endl;
-                cout << "5. Return to Previous Menu" << endl;
-                int choice = getValidIntInput("Enter your choice (1-5): ", 1);
-                switch (choice) {
-                    case 1: addRecord(); break;
-                    case 2: editRecord(); break;
-                    case 3: deleteRecord(); break;
-                    case 4: displayInventory(); break;
-                    case 5:
-                        if (getConfirmation("Are you sure you want to return to the previous menu?")) running = false;
-                        break;
-                    default: cout << "Invalid choice. Please try again." << endl;
-                }
-            } else {
-                cout << "1. Edit Product Quantity" << endl;
-                cout << "2. Display Products" << endl;
-                cout << "3. Return to Previous Menu" << endl;
-                int choice = getValidIntInput("Enter your choice (1-3): ", 1);
-                switch (choice) {
-                    case 1: editRecord(); break;
-                    case 2: displayInventory(); break;
-                    case 3:
-                        if (getConfirmation("Are you sure you want to return to the previous menu?")) running = false;
-                        break;
-                    default: cout << "Invalid choice. Please try again." << endl;
-                }
-            }
-        }
-    }
-};
+// Initialize static member
+ReportManager* ReportManager::instance = nullptr;
+
+// ================= INVENTORY MANAGER (SINGLETON) =================
 
 class InventoryManager {
 private:
-    RawMaterialInventory rawMaterials;
-    ProductInventory products;
+    unique_ptr<Inventory> rawMaterials;
+    unique_ptr<Inventory> products;
     bool isAdmin;
+    
+    static InventoryManager* instance;
+    
+    // Private constructor for Singleton
+    InventoryManager(bool admin = false) : isAdmin(admin) {
+        rawMaterials = make_unique<Inventory>("rawmaterial.txt", make_unique<RawMaterialInventory>(), admin);
+        products = make_unique<Inventory>("product.txt", make_unique<ProductInventory>(), admin);
+        initializeSampleData();
+    }
+    
     void initializeSampleData() {
         ifstream rmCheck("rawmaterial.txt");
         bool rmFileEmpty = !rmCheck || rmCheck.peek() == ifstream::traits_type::eof();
         rmCheck.close();
+        
         ifstream prodCheck("product.txt");
         bool prodFileEmpty = !prodCheck || prodCheck.peek() == ifstream::traits_type::eof();
         prodCheck.close();
+        
         if (rmFileEmpty) {
             ofstream rmFile("rawmaterial.txt");
             if (rmFile) {
@@ -589,6 +1124,7 @@ private:
                 cout << "Initialized sample raw materials data." << endl;
             }
         }
+        
         if (prodFileEmpty) {
             ofstream prodFile("product.txt");
             if (prodFile) {
@@ -607,10 +1143,37 @@ private:
             }
         }
     }
+    
 public:
-    InventoryManager(bool admin = false) : rawMaterials(admin), products(admin), isAdmin(admin) {
-        initializeSampleData();
+    // Delete copy constructor and assignment operator
+    InventoryManager(const InventoryManager&) = delete;
+    InventoryManager& operator=(const InventoryManager&) = delete;
+    
+    // Get singleton instance
+    static InventoryManager* getInstance(bool admin = false) {
+        if (!instance) {
+            instance = new InventoryManager(admin);
+        } else {
+            // Update admin status if needed
+            instance->setAdminStatus(admin);
+        }
+        return instance;
     }
+    
+    // Cleanup singleton
+    static void destroyInstance() {
+        if (instance) {
+            delete instance;
+            instance = nullptr;
+        }
+    }
+    
+    void setAdminStatus(bool admin) {
+        isAdmin = admin;
+        rawMaterials->setAdminStatus(admin);
+        products->setAdminStatus(admin);
+    }
+    
     void runInventoryMenu() {
         bool menu = true;
         while (menu) {
@@ -618,12 +1181,14 @@ public:
             cout << "1. Raw Material Inventory" << endl;
             cout << "2. Product Inventory" << endl;
             cout << "3. Return to Main Menu" << endl;
+            
             int choice = getValidIntInput("Enter your choice (1-3): ", 1);
             switch (choice) {
-                case 1: rawMaterials.displayMenu(); break;
-                case 2: products.displayMenu(); break;
+                case 1: rawMaterials->displayMenu(); break;
+                case 2: products->displayMenu(); break;
                 case 3:
-                    if (getConfirmation("Are you sure you want to return to the main menu?")) menu = false;
+                    if (getConfirmation("Are you sure you want to return to the main menu?")) 
+                        menu = false;
                     break;
                 default: cout << "Invalid choice. Please try again." << endl;
             }
@@ -631,132 +1196,42 @@ public:
     }
 };
 
-// ========== Inventory Reports ==========
+// Initialize static member
+InventoryManager* InventoryManager::instance = nullptr;
 
-void displayRawMatReport() {
-    struct Record {
-        int id;
-        string name;
-        int quantity;
-        double price;
-    };
-    ifstream file("rawmaterial.txt");
-    if (!file.is_open()) {
-        cout << "Error: Could not open product.txt for reading." << endl;
-        return;
-    }
-    time_t now = time(0);
-    char* dt = ctime(&now);
-    cout << "\n" << string(70, '=') << endl;
-    cout << setw(45) << "RAW MATERIAL INVENTORY REPORT" << endl;
-    cout << "Generated on: " << dt;
-    cout << string(70, '=') << endl;
-    cout << left << setw(5) << "ID"
-         << setw(25) << "Product Name"
-         << setw(10) << "Quantity"
-         << setw(15) << "Unit Price"
-         << setw(15) << "Value" << endl;
-    cout << string(70, '-') << endl;
-    int totalQuantity = 0;
-    double totalValue = 0.0;
-    string line;
-    while (getline(file, line)) {
-        stringstream ss(line);
-        Record record;
-        ss >> record.id;
-        ss.ignore();
-        getline(ss, record.name, '|');
-        ss >> record.quantity >> record.price;
-        double value = record.quantity * record.price;
-        totalQuantity += record.quantity;
-        totalValue += value;
-        cout << left << setw(5) << record.id
-             << setw(25) << record.name
-             << setw(10) << record.quantity
-             << "$" << setw(14) << fixed << setprecision(2) << record.price
-             << "$" << setw(14) << fixed << setprecision(2) << value << endl;
-    }
-    file.close();
-    cout << string(70, '-') << endl;
-    cout << left << setw(30) << "TOTAL:"
-         << setw(10) << totalQuantity
-         << setw(15) << ""
-         << "$" << fixed << setprecision(2) << totalValue << endl;
-    cout << string(70, '=') << endl;
-}
+// ================= MENU SYSTEM =================
 
-void displayProductReport() {
-    struct Record {
-        int id;
-        string name;
-        int quantity;
-        double price;
-    };
-    ifstream file("product.txt");
-    if (!file.is_open()) {
-        cout << "Error: Could not open product.txt for reading." << endl;
-        return;
-    }
-    time_t now = time(0);
-    char* dt = ctime(&now);
-    cout << "\n" << string(70, '=') << endl;
-    cout << setw(45) << "PRODUCT INVENTORY REPORT" << endl;
-    cout << "Generated on: " << dt;
-    cout << string(70, '=') << endl;
-    cout << left << setw(5) << "ID"
-         << setw(25) << "Product Name"
-         << setw(10) << "Quantity"
-         << setw(15) << "Unit Price"
-         << setw(15) << "Value" << endl;
-    cout << string(70, '-') << endl;
-    int totalQuantity = 0;
-    double totalValue = 0.0;
-    string line;
-    while (getline(file, line)) {
-        stringstream ss(line);
-        Record record;
-        ss >> record.id;
-        ss.ignore();
-        getline(ss, record.name, '|');
-        ss >> record.quantity >> record.price;
-        double value = record.quantity * record.price;
-        totalQuantity += record.quantity;
-        totalValue += value;
-        cout << left << setw(5) << record.id
-             << setw(25) << record.name
-             << setw(10) << record.quantity
-             << "$" << setw(14) << fixed << setprecision(2) << record.price
-             << "$" << setw(14) << fixed << setprecision(2) << value << endl;
-    }
-    file.close();
-    cout << string(70, '-') << endl;
-    cout << left << setw(30) << "TOTAL:"
-         << setw(10) << totalQuantity
-         << setw(15) << ""
-         << "$" << fixed << setprecision(2) << totalValue << endl;
-    cout << string(70, '=') << endl;
-}
-
-void reportUI() {
-    cout << "\n--------------------------------" << endl;
-    cout << "|       REPORTS DASHBOARD      |" << endl;
-    cout << "--------------------------------" << endl;
-    cout << "1. Product Inventory Report" << endl;
-    cout << "2. Raw Material Inventory Report" << endl;
-    cout << "3. Return to Previous Menu" << endl;
-    int choice = getValidIntInput("Enter your choice (1-3): ", 1);
-    switch (choice) {
-        case 1: displayProductReport(); break;
-        case 2: displayRawMatReport(); break;
-        case 3: cout << "Returning to previous menu..." << endl; break;
-        default: cout << "Invalid choice. Please try again." << endl; break;
+void adminUserManagementMenu() {
+    UserManager* userManager = UserManager::getInstance();
+    
+    while (true) {
+        cout << "\n--- Admin User Management ---\n";
+        cout << "1. List Admins\n2. List Employees\n3. Add Admin\n4. Add Employee\n";
+        cout << "5. Edit Admin\n6. Edit Employee\n7. Delete Admin\n8. Delete Employee\n0. Back\nChoice: ";
+        
+        int choice;
+        cin >> choice;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        
+        switch (choice) {
+            case 1: userManager->listUsers(true); break;
+            case 2: userManager->listUsers(false); break;
+            case 3: userManager->addUser(true); break;
+            case 4: userManager->addUser(false); break;
+            case 5: userManager->editUser(true); break;
+            case 6: userManager->editUser(false); break;
+            case 7: userManager->deleteUser(true); break;
+            case 8: userManager->deleteUser(false); break;
+            case 0: return;
+            default: cout << "Invalid choice.\n";
+        }
     }
 }
-
-// ========== MENUS ==========
 
 void adminMenu() {
-    InventoryManager inventoryManager(true);
+    InventoryManager* inventoryManager = InventoryManager::getInstance(true);
+    ReportManager* reportManager = ReportManager::getInstance();
+    
     bool adminSession = true;
     while (adminSession) {
         cout << "\n--------------------------------" << endl;
@@ -766,11 +1241,12 @@ void adminMenu() {
         cout << "2. Manage Users" << endl;
         cout << "3. Reports" << endl;
         cout << "4. Logout" << endl;
+        
         int adminChoice = getValidIntInput("Enter your choice (1-4): ", 1);
         switch (adminChoice) {
-            case 1: inventoryManager.runInventoryMenu(); break;
+            case 1: inventoryManager->runInventoryMenu(); break;
             case 2: adminUserManagementMenu(); break;
-            case 3: reportUI(); break;
+            case 3: reportManager->reportUI(); break;
             case 4:
                 if (getConfirmation("Are you sure you want to logout?")) {
                     cout << "Logging out from admin account..." << endl;
@@ -783,7 +1259,8 @@ void adminMenu() {
 }
 
 void employeeMenu() {
-    InventoryManager inventoryManager(false);
+    InventoryManager* inventoryManager = InventoryManager::getInstance(false);
+    
     bool empSession = true;
     while (empSession) {
         cout << "\n--------------------------------" << endl;
@@ -791,9 +1268,10 @@ void employeeMenu() {
         cout << "--------------------------------" << endl;
         cout << "1. Manage Inventory" << endl;
         cout << "2. Logout" << endl;
+        
         int empChoice = getValidIntInput("Enter your choice (1-2): ", 1);
         switch (empChoice) {
-            case 1: inventoryManager.runInventoryMenu(); break;
+            case 1: inventoryManager->runInventoryMenu(); break;
             case 2:
                 if (getConfirmation("Are you sure you want to logout?")) {
                     cout << "Logging out from employee account..." << endl;
@@ -805,36 +1283,17 @@ void employeeMenu() {
     }
 }
 
-void createDefaultCredentialsIfNeeded() {
-    ifstream adminCheck("admin.txt");
-    if (!adminCheck) {
-        ofstream adminFile("admin.txt");
-        if (adminFile) {
-            adminFile << "admin,admin123" << endl;
-            adminFile.close();
-            cout << "Created default admin credentials." << endl;
-        }
-    } else {
-        adminCheck.close();
-    }
-    ifstream empCheck("employee.txt");
-    if (!empCheck) {
-        ofstream empFile("employee.txt");
-        if (empFile) {
-            empFile << "employee,emp123" << endl;
-            empFile.close();
-            cout << "Created default employee credentials." << endl;
-        }
-    } else {
-        empCheck.close();
-    }
-}
+// ================= MAIN FUNCTION =================
 
 int main() {
     string username, password;
     string userType;
     bool runProgram = true;
-    createDefaultCredentialsIfNeeded();
+    
+    // Initialize singletons
+    UserManager* userManager = UserManager::getInstance();
+    userManager->createDefaultCredentialsIfNeeded();
+    
     while (runProgram) {
         cout << "\n--------------------------------" << endl;
         cout << "|        LOGIN SYSTEM          |" << endl;
@@ -843,10 +1302,9 @@ int main() {
         cin >> username;
         cout << "Enter password: ";
         cin >> password;
-        userType = checkCredentials(username, password, "admin.txt");
-        if (userType.empty()) {
-            userType = checkCredentials(username, password, "employee.txt");
-        }
+        
+        userType = userManager->checkCredentials(username, password);
+        
         if (!userType.empty()) {
             cout << "\nLogin successful! You are logged in as " << userType << "." << endl;
             if (userType == "admin") {
@@ -862,5 +1320,11 @@ int main() {
             }
         }
     }
+    
+    // Clean up singletons
+    UserManager::destroyInstance();
+    InventoryManager::destroyInstance();
+    ReportManager::destroyInstance();
+    
     return 0;
 }
