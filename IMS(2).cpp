@@ -777,9 +777,18 @@ public:
 
 class InventoryManager {
 private:
+    static InventoryManager* instance;
     RawMaterialInventory rawMaterials;
     ProductInventory products;
     bool isAdmin;
+    
+    InventoryManager(bool admin = false) : rawMaterials(admin), products(admin), isAdmin(admin) {
+        try {
+            initializeSampleData();
+        } catch (const std::exception& e) {
+            cout << "Error initializing sample data: " << e.what() << endl;
+        }
+    }
     
     void initializeSampleData() {
         ifstream rmCheck("rawmaterial.txt");
@@ -828,32 +837,49 @@ private:
     }
     
 public:
-    InventoryManager(bool admin = false) : rawMaterials(admin), products(admin), isAdmin(admin) {
-        initializeSampleData();
+    static InventoryManager* getInstance(bool admin = false) {
+        if (!instance) {
+            instance = new InventoryManager(admin);
+        }
+        return instance;
+    }
+    static void destroyInstance() {
+        if (instance) {
+            delete instance;
+            instance = nullptr;
+        }
     }
     
     void runInventoryMenu() {
-        bool menu = true;
-        while (menu) {
-            cout << "\n ----- Inventory Management Menu ----- " << endl;
-            cout << "1. Raw Material Inventory" << endl;
-            cout << "2. Product Inventory" << endl;
-            cout << "3. Return to Main Menu" << endl;
-            
-            // Improved menu choice validation
-            int choice = getValidIntInput("Enter your choice (1-3): ", 1, 3);
-            
-            switch (choice) {
-                case 1: rawMaterials.displayMenu(); break;
-                case 2: products.displayMenu(); break;
-                case 3:
-                    if (getConfirmation("Are you sure you want to return to the main menu?")) menu = false;
-                    break;
-                default: cout << "Invalid choice. Please try again." << endl;
+        try {
+            bool menu = true;
+            while (menu) {
+                cout << "\n ----- Inventory Management Menu ----- " << endl;
+                cout << "1. Raw Material Inventory" << endl;
+                cout << "2. Product Inventory" << endl;
+                cout << "3. Return to Main Menu" << endl;
+                
+                // Improved menu choice validation
+                int choice = getValidIntInput("Enter your choice (1-3): ", 1, 3);
+                
+                switch (choice) {
+                    case 1: rawMaterials.displayMenu(); break;
+                    case 2: products.displayMenu(); break;
+                    case 3:
+                        if (getConfirmation("Are you sure you want to return to the main menu?")) menu = false;
+                        break;
+                    default: cout << "Invalid choice. Please try again." << endl;
+                }
             }
+        } catch (const std::exception& e) {
+            cout << "Error in Inventory Menu: " << e.what() << endl;
         }
     }
+    
+    ~InventoryManager() {}
 };
+
+InventoryManager* InventoryManager::instance = nullptr;
 
 // ========== Inventory Reports ==========
 
@@ -997,61 +1023,69 @@ void reportUI() {
 // ========== MENUS ==========
 
 void adminMenu() {
-    InventoryManager inventoryManager(true);
+    InventoryManager* inventoryManager = InventoryManager::getInstance(true);
     bool adminSession = true;
-    
     while (adminSession) {
-        cout << "\n--------------------------------" << endl;
-        cout << "|       ADMIN DASHBOARD        |" << endl;
-        cout << "--------------------------------" << endl;
-        cout << "1. Manage Inventory" << endl;
-        cout << "2. Manage Users" << endl;
-        cout << "3. Reports" << endl;
-        cout << "4. Logout" << endl;
-        
-        // Improved menu choice validation
-        int adminChoice = getValidIntInput("Enter your choice (1-4): ", 1, 4);
-        
-        switch (adminChoice) {
-            case 1: inventoryManager.runInventoryMenu(); break;
-            case 2: adminUserManagementMenu(); break;
-            case 3: reportUI(); break;
-            case 4:
-                if (getConfirmation("Are you sure you want to logout?")) {
-                    cout << "Logging out from admin account..." << endl;
-                    adminSession = false;
-                }
-                break;
-            default: cout << "Invalid choice. Please try again." << endl; break;
+        try {
+            cout << "\n--------------------------------" << endl;
+            cout << "|       ADMIN DASHBOARD        |" << endl;
+            cout << "--------------------------------" << endl;
+            cout << "1. Manage Inventory" << endl;
+            cout << "2. Manage Users" << endl;
+            cout << "3. Reports" << endl;
+            cout << "4. Logout" << endl;
+            
+            // Improved menu choice validation
+            int adminChoice = getValidIntInput("Enter your choice (1-4): ", 1, 4);
+            
+            switch (adminChoice) {
+                case 1: inventoryManager->runInventoryMenu(); break;
+                case 2: adminUserManagementMenu(); break;
+                case 3: reportUI(); break;
+                case 4:
+                    if (getConfirmation("Are you sure you want to logout?")) {
+                        cout << "Logging out from admin account..." << endl;
+                        adminSession = false;
+                    }
+                    break;
+                default: cout << "Invalid choice. Please try again." << endl; break;
+            }
+        } catch (const std::exception& e) {
+            cout << "Error in Admin Menu: " << e.what() << endl;
         }
     }
+    InventoryManager::destroyInstance();
 }
 
 void employeeMenu() {
-    InventoryManager inventoryManager(false);
+    InventoryManager* inventoryManager = InventoryManager::getInstance(false);
     bool empSession = true;
-    
     while (empSession) {
-        cout << "\n--------------------------------" << endl;
-        cout << "|      EMPLOYEE DASHBOARD      |" << endl;
-        cout << "--------------------------------" << endl;
-        cout << "1. Manage Inventory" << endl;
-        cout << "2. Logout" << endl;
-        
-        // Improved menu choice validation for employee dashboard
-        int empChoice = getValidIntInput("Enter your choice (1-2): ", 1, 2);
-        
-        switch (empChoice) {
-            case 1: inventoryManager.runInventoryMenu(); break;
-            case 2:
-                if (getConfirmation("Are you sure you want to logout?")) {
-                    cout << "Logging out from employee account..." << endl;
-                    empSession = false;
-                }
-                break;
-            default: cout << "Invalid choice. Please try again." << endl; break;
+        try {
+            cout << "\n--------------------------------" << endl;
+            cout << "|      EMPLOYEE DASHBOARD      |" << endl;
+            cout << "--------------------------------" << endl;
+            cout << "1. Manage Inventory" << endl;
+            cout << "2. Logout" << endl;
+            
+            // Improved menu choice validation for employee dashboard
+            int empChoice = getValidIntInput("Enter your choice (1-2): ", 1, 2);
+            
+            switch (empChoice) {
+                case 1: inventoryManager->runInventoryMenu(); break;
+                case 2:
+                    if (getConfirmation("Are you sure you want to logout?")) {
+                        cout << "Logging out from employee account..." << endl;
+                        empSession = false;
+                    }
+                    break;
+                default: cout << "Invalid choice. Please try again." << endl; break;
+            }
+        } catch (const std::exception& e) {
+            cout << "Error in Employee Menu: " << e.what() << endl;
         }
     }
+    InventoryManager::destroyInstance();
 }
 
 void createDefaultCredentialsIfNeeded() {
@@ -1085,108 +1119,110 @@ int main() {
     string username, password;
     string userType;
     bool runProgram = true;
-    
-    createDefaultCredentialsIfNeeded();
-    
-    while (runProgram) {
-        cout << "\n--------------------------------" << endl;
-        cout << "|        LOGIN SYSTEM          |" << endl;
-        cout << "--------------------------------" << endl;
+    bool tryAgain = false;
+    bool validResponse = false;
+    try {
+        createDefaultCredentialsIfNeeded();
         
-        // Username validation
-        bool validUsername = false;
-        while (!validUsername) {
-            cout << "Enter username: ";
-            getline(cin, username);
+        while (runProgram) {
+            cout << "\n--------------------------------" << endl;
+            cout << "|        LOGIN SYSTEM          |" << endl;
+            cout << "--------------------------------" << endl;
             
-            // Check if username contains any whitespace
-            bool hasWhitespace = false;
-            for (char c : username) {
-                if (isspace(c)) {
-                    hasWhitespace = true;
-                    break;
-                }
-            }
-            
-            if (hasWhitespace) {
-                cout << "Invalid username. Username cannot contain spaces." << endl;
-            } else if (username.empty()) {
-                cout << "Username cannot be empty." << endl;
-            } else {
-                validUsername = true;
-            }
-        }
-        
-        // Password validation
-        bool validPassword = false;
-        while (!validPassword) {
-            cout << "Enter password: ";
-            getline(cin, password);
-            
-            // Check if password contains any whitespace
-            bool hasWhitespace = false;
-            for (char c : password) {
-                if (isspace(c)) {
-                    hasWhitespace = true;
-                    break;
-                }
-            }
-            
-            if (hasWhitespace) {
-                cout << "Invalid password. Password cannot contain spaces." << endl;
-            } else if (password.empty()) {
-                cout << "Password cannot be empty." << endl;
-            } else {
-                validPassword = true;
-            }
-        }
-        
-        userType = checkCredentials(username, password, "admin.txt");
-        if (userType.empty()) {
-            userType = checkCredentials(username, password, "employee.txt");
-        }
-        
-        if (!userType.empty()) {
-            cout << "\nLogin successful! You are logged in as " << userType << "." << endl;
-            if (userType == "admin") {
-                adminMenu();
-            } else {
-                employeeMenu();
-            }
-        } else {
-            cout << "Login failed. Invalid username or password." << endl;
-            
-            // Improved login retry validation
-            bool validResponse = false;
-            bool tryAgain = false;
-            
-            while (!validResponse) {
-                cout << "Do you want to try again? (y/n): ";
-                string response;
-                getline(cin, response);
+            // Username validation
+            bool validUsername = false;
+            while (!validUsername) {
+                cout << "Enter username: ";
+                getline(cin, username);
                 
-                if (response.length() == 1) {
-                    char answer = tolower(response[0]);
-                    if (answer == 'y') {
-                        tryAgain = true;
-                        validResponse = true;
-                    } else if (answer == 'n') {
-                        tryAgain = false;
-                        validResponse = true;
+                // Check if username contains any whitespace
+                bool hasWhitespace = false;
+                for (char c : username) {
+                    if (isspace(c)) {
+                        hasWhitespace = true;
+                        break;
                     }
                 }
                 
-                if (!validResponse) {
-                    cout << "Invalid input. Please enter 'y' or 'n'." << endl;
+                if (hasWhitespace) {
+                    cout << "Invalid username. Username cannot contain spaces." << endl;
+                } else if (username.empty()) {
+                    cout << "Username cannot be empty." << endl;
+                } else {
+                    validUsername = true;
                 }
             }
             
-            if (!tryAgain) {
-                runProgram = false;
-                cout << "Exiting program. Goodbye!" << endl;
+            // Password validation
+            bool validPassword = false;
+            while (!validPassword) {
+                cout << "Enter password: ";
+                getline(cin, password);
+                
+                // Check if password contains any whitespace
+                bool hasWhitespace = false;
+                for (char c : password) {
+                    if (isspace(c)) {
+                        hasWhitespace = true;
+                        break;
+                    }
+                }
+                
+                if (hasWhitespace) {
+                    cout << "Invalid password. Password cannot contain spaces." << endl;
+                } else if (password.empty()) {
+                    cout << "Password cannot be empty." << endl;
+                } else {
+                    validPassword = true;
+                }
+            }
+            
+            userType = checkCredentials(username, password, "admin.txt");
+            if (userType.empty()) {
+                userType = checkCredentials(username, password, "employee.txt");
+            }
+            
+            if (!userType.empty()) {
+                cout << "\nLogin successful! You are logged in as " << userType << "." << endl;
+                if (userType == "admin") {
+                    adminMenu();
+                } else {
+                    employeeMenu();
+                }
+            } else {
+                cout << "Login failed. Invalid username or password." << endl;
+                
+                validResponse = false;
+                tryAgain = false;
+                while (!validResponse) {
+                    cout << "Do you want to try again? (y/n): ";
+                    string response;
+                    getline(cin, response);
+                    
+                    if (response.length() == 1) {
+                        char answer = tolower(response[0]);
+                        if (answer == 'y') {
+                            tryAgain = true;
+                            validResponse = true;
+                        } else if (answer == 'n') {
+                            tryAgain = false;
+                            validResponse = true;
+                        }
+                    }
+                    
+                    if (!validResponse) {
+                        cout << "Invalid input. Please enter 'y' or 'n'." << endl;
+                    }
+                }
+                
+                if (!tryAgain) {
+                    runProgram = false;
+                    cout << "Exiting program. Goodbye!" << endl;
+                }
             }
         }
+    } catch (const std::exception& e) {
+        cout << "Fatal error: " << e.what() << endl;
     }
-    
     return 0;
 }
