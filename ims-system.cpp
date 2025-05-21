@@ -580,8 +580,14 @@ private:
     RawMaterialInventory rawMaterials;
     ProductInventory products;
     bool isAdmin;
-
-    // Method to initialize sample data if inventory files are empty
+    static InventoryManager* instance;
+    InventoryManager(bool admin = false) : rawMaterials(admin), products(admin), isAdmin(admin) {
+        try {
+            initializeSampleData();
+        } catch (const std::exception& e) {
+            cout << "Error initializing sample data: " << e.what() << endl;
+        }
+    }
     void initializeSampleData() {
         // Check if raw material file exists and has content
         ifstream rmCheck("rawmaterial.txt");
@@ -633,41 +639,50 @@ private:
     }
 
 public:
-    InventoryManager(bool admin = false) : rawMaterials(admin), products(admin), isAdmin(admin) {
-        // Initialize sample data if needed
-        initializeSampleData();
+    // Singleton access
+    static InventoryManager* getInstance(bool admin = false) {
+        if (!instance) {
+            instance = new InventoryManager(admin);
+        } else {
+            instance->setAdminStatus(admin);
+        }
+        return instance;
     }
-
+    static void destroyInstance() {
+        if (instance) {
+            delete instance;
+            instance = nullptr;
+        }
+    }
+    void setAdminStatus(bool admin) {
+        isAdmin = admin;
+        rawMaterials.setAdminStatus(admin);
+        products.setAdminStatus(admin);
+    }
     void runInventoryMenu() {
         bool menu = true;
-    
         while (menu) {
-            cout << "\n ----- Inventory Management Menu ----- " << endl;
-            cout << "1. Raw Material Inventory" << endl;
-            cout << "2. Product Inventory" << endl;
-            cout << "3. Return to Main Menu" << endl;
-    
-            int choice = getValidIntInput("Enter your choice (1-3): ", 1);
-    
-            switch (choice) {
-                case 1:
-                    rawMaterials.displayMenu();
-                    break;
-                case 2:
-                    products.displayMenu();
-                    break;
-                case 3:
-                    if (getConfirmation("Are you sure you want to return to the main menu?")) {
-                        menu = false;
-                    }
-                    break;
-                default:
-                    cout << "Invalid choice. Please try again." << endl;
-                    break;
+            try {
+                cout << "\n ----- Inventory Management Menu ----- " << endl;
+                cout << "1. Raw Material Inventory" << endl;
+                cout << "2. Product Inventory" << endl;
+                cout << "3. Return to Main Menu" << endl;
+                int choice = getValidIntInput("Enter your choice (1-3): ", 1);
+                switch (choice) {
+                    case 1: rawMaterials.displayMenu(); break;
+                    case 2: products.displayMenu(); break;
+                    case 3:
+                        if (getConfirmation("Are you sure you want to return to the main menu?")) menu = false;
+                        break;
+                    default: cout << "Invalid choice. Please try again." << endl; break;
+                }
+            } catch (const std::exception& e) {
+                cout << "Error in inventory menu: " << e.what() << endl;
             }
         }
     }
 };
+InventoryManager* InventoryManager::instance = nullptr;
 
 void displayRawMatReport() {
     struct Record {
@@ -833,70 +848,78 @@ void reportUI(){
 
 // Function for admin menu
 void adminMenu() {
-    InventoryManager inventoryManager(true); // Pass true to indicate admin privileges
+    InventoryManager* inventoryManager = InventoryManager::getInstance(true); // Singleton
     bool adminSession = true;
     
     while (adminSession) {
-        cout << "\n--------------------------------" << endl;
-        cout << "|       ADMIN DASHBOARD        |" << endl;
-        cout << "--------------------------------" << endl;
-        cout << "1. Manage Inventory" << endl;
-        cout << "2. Manage Users" << endl;
-        cout << "3. Reports" << endl;
-        cout << "4. Logout" << endl;
-        
-        int adminChoice = getValidIntInput("Enter your choice (1-5): ", 1);
-        
-        switch (adminChoice) {
-            case 1:
-                inventoryManager.runInventoryMenu();
-                break;
-            case 2:
-                cout << "User management module - Coming soon!" << endl;
-                break;
-            case 3:
-                reportUI();
-                break;
-            case 4:
-                if (getConfirmation("Are you sure you want to logout?")) {
-                    cout << "Logging out from admin account..." << endl;
-                    adminSession = false;
-                }
-                break;
-            default:
-                cout << "Invalid choice. Please try again." << endl;
-                break;
+        try {
+            cout << "\n--------------------------------" << endl;
+            cout << "|       ADMIN DASHBOARD        |" << endl;
+            cout << "--------------------------------" << endl;
+            cout << "1. Manage Inventory" << endl;
+            cout << "2. Manage Users" << endl;
+            cout << "3. Reports" << endl;
+            cout << "4. Logout" << endl;
+            
+            int adminChoice = getValidIntInput("Enter your choice (1-5): ", 1);
+            
+            switch (adminChoice) {
+                case 1:
+                    inventoryManager->runInventoryMenu();
+                    break;
+                case 2:
+                    cout << "User management module - Coming soon!" << endl;
+                    break;
+                case 3:
+                    reportUI();
+                    break;
+                case 4:
+                    if (getConfirmation("Are you sure you want to logout?")) {
+                        cout << "Logging out from admin account..." << endl;
+                        adminSession = false;
+                    }
+                    break;
+                default:
+                    cout << "Invalid choice. Please try again." << endl;
+                    break;
+            }
+        } catch (const std::exception& e) {
+            cout << "Error in admin menu: " << e.what() << endl;
         }
     }
 }
 
 // Function for employee menu
 void employeeMenu() {
-    InventoryManager inventoryManager(false); // Pass false to indicate employee privileges
+    InventoryManager* inventoryManager = InventoryManager::getInstance(false); // Singleton
     bool empSession = true;
     
     while (empSession) {
-        cout << "\n--------------------------------" << endl;
-        cout << "|      EMPLOYEE DASHBOARD      |" << endl;
-        cout << "--------------------------------" << endl;
-        cout << "1. Manage Inventory" << endl;
-        cout << "2. Logout" << endl;
-        
-        int empChoice = getValidIntInput("Enter your choice (1-2): ", 1);
-        
-        switch (empChoice) {
-            case 1:
-                inventoryManager.runInventoryMenu();
-                break;
-            case 2:
-                if (getConfirmation("Are you sure you want to logout?")) {
-                    cout << "Logging out from employee account..." << endl;
-                    empSession = false;
-                }
-                break;
-            default:
-                cout << "Invalid choice. Please try again." << endl;
-                break;
+        try {
+            cout << "\n--------------------------------" << endl;
+            cout << "|      EMPLOYEE DASHBOARD      |" << endl;
+            cout << "--------------------------------" << endl;
+            cout << "1. Manage Inventory" << endl;
+            cout << "2. Logout" << endl;
+            
+            int empChoice = getValidIntInput("Enter your choice (1-2): ", 1);
+            
+            switch (empChoice) {
+                case 1:
+                    inventoryManager->runInventoryMenu();
+                    break;
+                case 2:
+                    if (getConfirmation("Are you sure you want to logout?")) {
+                        cout << "Logging out from employee account..." << endl;
+                        empSession = false;
+                    }
+                    break;
+                default:
+                    cout << "Invalid choice. Please try again." << endl;
+                    break;
+            }
+        } catch (const std::exception& e) {
+            cout << "Error in employee menu: " << e.what() << endl;
         }
     }
 }
@@ -934,43 +957,39 @@ int main() {
     string username, password;
     string userType;
     bool runProgram = true;
-    
-    // Create default credential files if they don't exist
     createDefaultCredentialsIfNeeded();
-    
     while (runProgram) {
-        cout << "\n--------------------------------" << endl;
-        cout << "|        LOGIN SYSTEM          |" << endl;
-        cout << "--------------------------------" << endl;
-        cout << "Enter username: ";
-        cin >> username;
-        cout << "Enter password: ";
-        cin >> password;
-        
-        // Check admin credentials
-        userType = checkCredentials(username, password, "admin.txt");
-        
-        // If not found in admin.txt, check employee.txt
-        if (userType.empty()) {
-            userType = checkCredentials(username, password, "employee.txt");
-        }
-        
-        if (!userType.empty()) {
-            cout << "\nLogin successful! You are logged in as " << userType << "." << endl;
-            
-            if (userType == "admin") {
-                adminMenu();
+        try {
+            cout << "\n--------------------------------" << endl;
+            cout << "|        LOGIN SYSTEM          |" << endl;
+            cout << "--------------------------------" << endl;
+            cout << "Enter username: ";
+            cin >> username;
+            cout << "Enter password: ";
+            cin >> password;
+            userType = checkCredentials(username, password, "admin.txt");
+            if (userType.empty()) {
+                userType = checkCredentials(username, password, "employee.txt");
+            }
+            if (!userType.empty()) {
+                cout << "\nLogin successful! You are logged in as " << userType << "." << endl;
+                if (userType == "admin") {
+                    adminMenu();
+                } else {
+                    employeeMenu();
+                }
             } else {
-                employeeMenu();
+                cout << "Login failed. Invalid username or password." << endl;
+                if (!getConfirmation("Do you want to try again?")) {
+                    runProgram = false;
+                    cout << "Exiting program. Goodbye!" << endl;
+                }
             }
-        } else {
-            cout << "Login failed. Invalid username or password." << endl;
-            if (!getConfirmation("Do you want to try again?")) {
-                runProgram = false;
-                cout << "Exiting program. Goodbye!" << endl;
-            }
+        } catch (const std::exception& e) {
+            cout << "Unexpected error: " << e.what() << endl;
+            runProgram = false;
         }
     }
-    
+    InventoryManager::destroyInstance();
     return 0;
 }

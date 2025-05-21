@@ -8,4 +8,3 @@
 8 Zippers|1200 15
 9 Elastic Bands|800 8
 10 Labels/Tags|1000 3
-10 Labels/Tags|1000 3
