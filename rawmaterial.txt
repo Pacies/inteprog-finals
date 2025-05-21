@@ -7,8 +7,4 @@
 7 Buttons|2500 5
 8 Zippers|1200 15
 9 Elastic Bands|800 8
-<<<<<<< HEAD
 10 Labels/Tags|1200 3
-=======
-10 Labels/Tags|1200 3
->>>>>>> e52b2c0 (4th revision)
