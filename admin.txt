@@ -1,2 +1,6 @@
 admin1,87654321
+<<<<<<< HEAD
 admin3,123
+=======
+admin3,123
+>>>>>>> e52b2c0 (4th revision)

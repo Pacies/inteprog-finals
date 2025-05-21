@@ -8,4 +8,8 @@
 8 Dresses|85 300
 9 Shorts|95 270
 10 Polo Shirts|130 270
+<<<<<<< HEAD
 12 orts|40 1
+=======
+12 Shorts|120 350
+>>>>>>> e52b2c0 (4th revision)
