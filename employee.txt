@@ -1,6 +1,2 @@
 employee1,12345678
-<<<<<<< HEAD
 employee3,123
-=======
-employee3,123
->>>>>>> e52b2c0 (4th revision)
