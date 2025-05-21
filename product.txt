@@ -8,3 +8,4 @@
 8 Dresses|85 300
 9 Shorts|100 270
 10 Polo Shirts|130 270
+12 Shorts|120 350

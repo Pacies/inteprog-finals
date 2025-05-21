@@ -1,6 +1,2 @@
 admin1,87654321
-<<<<<<< HEAD
 admin3,123
-=======
-admin3,123
-                 admin2,                   password
